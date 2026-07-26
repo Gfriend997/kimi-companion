@@ -1,0 +1,6 @@
+kimi-companion
+
+Structure and command surface follow the author's gemini-companion plugin
+(MIT), which in turn was inspired by the OpenAI Codex plugin for Claude Code
+(Apache License 2.0, Copyright OpenAI). No third-party source was copied; the
+runtime was written fresh against the Moonshot (Kimi) REST API.

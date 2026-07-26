@@ -1,0 +1,13 @@
+{
+  "name": "kimi-companion",
+  "owner": {
+    "name": "Gary Wong"
+  },
+  "plugins": [
+    {
+      "name": "kimi-companion",
+      "source": "./",
+      "description": "Use Moonshot Kimi from Claude Code: long-context analysis, image and video understanding, code review, delegated tasks. API key stays in the environment."
+    }
+  ]
+}
