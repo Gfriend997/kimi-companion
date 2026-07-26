@@ -13,4 +13,8 @@ Confirm with one line first, then proceed:
 Never route to Kimi:
 - Image, video, or movie GENERATION. Moonshot has no such endpoint. Use the Gemini companion for raster image generation.
 
+When both companions are loaded:
+- Routine second opinion on a diff belongs to Gemini. Only run /kimi-companion:review when the user asks for Kimi by name, or when Gemini already reviewed and a third read is wanted. Do not run both for one diff.
+- Anything involving reading an image, a video, a screenshot, or a very large body of text is Kimi's, not Gemini's.
+
 Always: never include secrets, credentials, or API keys in prompts sent to Kimi.
