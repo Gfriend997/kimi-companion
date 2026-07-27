@@ -1,6 +1,6 @@
 {
   "name": "kimi-companion",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Use Moonshot Kimi from Claude Code: long-context analysis, image and video understanding, code review, delegated tasks. API key stays in the environment.",
   "author": {
     "name": "Gary Wong"
