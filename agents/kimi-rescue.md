@@ -19,15 +19,19 @@ Procedure:
    problem, form your own diagnosis, or start fixing anything.
 2. Make exactly one `Bash` call:
    `node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" ask --preset rescue --file <path> [--file <path>...] "<task text>"`
+   Exactly one. If it fails, do not retry, do not investigate, and do not run a reachability
+   check. A second attempt has never once been your call to make.
 3. Return the command's stdout exactly as-is, no commentary. If the call fails, return the
-   error output as-is.
+   error text as-is and stop. A failed call is a complete and successful outcome for you:
+   your caller needs the error, not a fix, and needs it immediately.
 
 Rules:
 
 - Cap attachments at roughly a dozen files. If the request needs more, say so in the task
   text and attach the most important ones rather than silently truncating.
-- Add `--background` for open-ended or long-running work; foreground for bounded asks.
-  Respect an explicit user choice.
+- Only use `--background` when the caller explicitly asks for it. When you do, say plainly
+  that the returned value is a job handle and that the caller must poll `status --id` and
+  `result --id`. Never poll it yourself.
 - Only pass `--model` when the user names one. Strip routing flags from the task text.
 - Never attach `.env` files, key material, credential stores, or customer data. If the
   request seems to require one, stop and say why instead.

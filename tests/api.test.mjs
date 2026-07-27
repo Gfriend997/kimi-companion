@@ -1,6 +1,24 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { apiBase, apiKey, validModel, reasoningParams, parseCompletion } from "../scripts/lib/api.mjs";
+import {
+  apiBase,
+  apiKey,
+  validModel,
+  reasoningParams,
+  parseCompletion,
+  transportError,
+  collectStream
+} from "../scripts/lib/api.mjs";
+
+// Feeds bytes to collectStream the way a socket would: arbitrary chunk boundaries.
+async function* bytes(...chunks) {
+  const enc = new TextEncoder();
+  for (const c of chunks) yield enc.encode(c);
+}
+
+function sse(obj) {
+  return `data: ${JSON.stringify(obj)}\n\n`;
+}
 
 afterEach(() => {
   delete process.env.MOONSHOT_BASE_URL;
@@ -71,4 +89,64 @@ test("parseCompletion explains a reasoning-only truncation", () => {
 
 test("parseCompletion rejects an empty body", () => {
   assert.throws(() => parseCompletion({}), /no completion/);
+});
+
+test("transportError names undici's transport timeout instead of 'fetch failed'", () => {
+  const err = Object.assign(new TypeError("fetch failed"), {
+    cause: { code: "UND_ERR_HEADERS_TIMEOUT" }
+  });
+  const msg = transportError(err, 600000).message;
+  assert.match(msg, /UND_ERR_HEADERS_TIMEOUT/);
+  assert.match(msg, /not a network error/);
+  assert.doesNotMatch(msg, /^Moonshot API request failed: fetch failed$/);
+});
+
+test("transportError still reports the wrapper's own abort as a timeout", () => {
+  const err = Object.assign(new Error("aborted"), { name: "AbortError" });
+  assert.match(transportError(err, 600000).message, /timed out after 10 min/);
+});
+
+test("transportError appends an unknown error code rather than dropping it", () => {
+  const err = Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNRESET" } });
+  assert.match(transportError(err, 600000).message, /fetch failed \(ECONNRESET\)/);
+});
+
+test("collectStream accumulates content, reasoning, finish_reason and usage", async () => {
+  const body = await collectStream(
+    bytes(
+      sse({ choices: [{ delta: { reasoning_content: "think" } }] }),
+      sse({ choices: [{ delta: { content: "he" } }] }),
+      sse({ choices: [{ delta: { content: "llo" }, finish_reason: "stop" }] }),
+      sse({ choices: [], usage: { prompt_tokens: 7, completion_tokens: 2 } }),
+      "data: [DONE]\n\n"
+    )
+  );
+  const res = parseCompletion(body);
+  assert.equal(res.text, "hello");
+  assert.equal(res.reasoning, "think");
+  assert.equal(res.finish, "stop");
+  assert.deepEqual(res.usage, { prompt_tokens: 7, completion_tokens: 2 });
+});
+
+test("collectStream reassembles an SSE event split across chunk boundaries", async () => {
+  const event = sse({ choices: [{ delta: { content: "split" }, finish_reason: "stop" }] });
+  const body = await collectStream(bytes(event.slice(0, 11), event.slice(11, 25), event.slice(25)));
+  assert.equal(parseCompletion(body).text, "split");
+});
+
+test("collectStream preserves the reasoning-only truncation error", async () => {
+  const body = await collectStream(
+    bytes(
+      sse({ choices: [{ delta: { reasoning_content: "thought and thought" } }] }),
+      sse({ choices: [{ delta: {}, finish_reason: "length" }] })
+    )
+  );
+  assert.throws(() => parseCompletion(body), /raise --max-tokens/);
+});
+
+test("collectStream surfaces an error event mid-stream", async () => {
+  await assert.rejects(
+    () => collectStream(bytes(sse({ error: { message: "rate limit reached" } }))),
+    /rate limit reached/
+  );
 });

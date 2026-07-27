@@ -78,39 +78,123 @@ export function parseCompletion(body) {
   };
 }
 
+// Node's fetch is undici, whose headersTimeout and bodyTimeout both default to
+// 300s and cannot be changed without adding undici as a dependency. A dropped
+// socket surfaces as the bare string "fetch failed", which reads like a network
+// blip and invites a retry that is guaranteed to fail the same way. Keep the
+// real code.
+export function transportError(err, timeoutMs) {
+  if (err.name === "AbortError") {
+    return new Error(`Moonshot API timed out after ${Math.round(timeoutMs / 60000)} min`);
+  }
+  const code = err.cause?.code ?? err.code;
+  if (code === "UND_ERR_HEADERS_TIMEOUT" || code === "UND_ERR_BODY_TIMEOUT") {
+    return new Error(
+      `Moonshot API hit undici's 300s transport timeout (${code}) — this is not a network error, ` +
+      `and retrying unchanged will fail identically. Lower --max-tokens or --effort.`
+    );
+  }
+  return new Error(`Moonshot API request failed: ${err.message}${code ? ` (${code})` : ""}`);
+}
+
+// Accumulates an OpenAI-style SSE completion into the same shape parseCompletion
+// already understands, so streaming and non-streaming share one set of error
+// semantics. Events are reassembled across chunk boundaries: a socket splits
+// wherever it likes, including mid-JSON.
+export async function collectStream(stream) {
+  const decoder = new TextDecoder();
+  let text = "";
+  let reasoning = "";
+  let usage = null;
+  let finish = null;
+
+  const handle = (line) => {
+    if (!line.startsWith("data:")) return;
+    const payload = line.slice(5).trim();
+    if (!payload || payload === "[DONE]") return;
+    let event;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      return; // a keep-alive or comment frame, not a completion event
+    }
+    if (event.error) {
+      throw new Error(`Moonshot API stream error: ${event.error.message ?? JSON.stringify(event.error)}`);
+    }
+    const choice = event.choices?.[0];
+    if (choice) {
+      const delta = choice.delta ?? {};
+      if (typeof delta.content === "string") text += delta.content;
+      if (typeof delta.reasoning_content === "string") reasoning += delta.reasoning_content;
+      if (choice.finish_reason) finish = choice.finish_reason;
+    }
+    if (event.usage) usage = event.usage;
+  };
+
+  let buffer = "";
+  for await (const chunk of stream) {
+    buffer += decoder.decode(chunk, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) handle(line.replace(/\r$/, ""));
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) handle(buffer.replace(/\r$/, ""));
+
+  return {
+    choices: [{ message: { content: text, reasoning_content: reasoning }, finish_reason: finish }],
+    usage
+  };
+}
+
 async function request(pathname, { method = "GET", body, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  let res;
+  // The timer stays armed until the body is fully consumed. On the streaming
+  // path that read *is* the generation, so clearing it any earlier would leave
+  // long completions with no timeout at all.
   try {
-    res = await fetch(`${apiBase()}${pathname}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${apiKey()}`,
-        ...(body ? { "Content-Type": "application/json" } : {})
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal
-    });
-  } catch (err) {
-    if (err.name === "AbortError") throw new Error(`Moonshot API timed out after ${Math.round(timeoutMs / 60000)} min`);
-    throw new Error(`Moonshot API request failed: ${err.message}`);
+    let res;
+    try {
+      res = await fetch(`${apiBase()}${pathname}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${apiKey()}`,
+          ...(body ? { "Content-Type": "application/json" } : {})
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal
+      });
+    } catch (err) {
+      throw transportError(err, timeoutMs);
+    }
+
+    // An error response is JSON even when the request asked for a stream.
+    if (!res.ok) {
+      const raw = await res.text();
+      let detail = raw.slice(0, 1000);
+      try {
+        detail = JSON.parse(raw)?.error?.message ?? detail;
+      } catch { /* keep raw text */ }
+      throw new Error(`Moonshot API ${res.status}: ${detail}`);
+    }
+
+    if (body?.stream) {
+      try {
+        return await collectStream(res.body);
+      } catch (err) {
+        throw err.message?.startsWith("Moonshot API") ? err : transportError(err, timeoutMs);
+      }
+    }
+
+    const raw = await res.text();
+    try {
+      return JSON.parse(raw);
+    } catch {
+      throw new Error(`Moonshot API returned non-JSON body: ${raw.slice(0, 200)}`);
+    }
   } finally {
     clearTimeout(timer);
-  }
-
-  const raw = await res.text();
-  if (!res.ok) {
-    let detail = raw.slice(0, 1000);
-    try {
-      detail = JSON.parse(raw)?.error?.message ?? detail;
-    } catch { /* keep raw text */ }
-    throw new Error(`Moonshot API ${res.status}: ${detail}`);
-  }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error(`Moonshot API returned non-JSON body: ${raw.slice(0, 200)}`);
   }
 }
 
@@ -129,10 +213,23 @@ export async function chat({
   validModel(model);
   // temperature/top_p are fixed server-side on k2.6/k2.7/k3 — sending them can be
   // rejected outright, so the request carries only what every model accepts.
+  //
+  // stream: true is not about progress output. Non-streaming responses emit no
+  // headers until generation finishes, so undici's 300s headersTimeout killed
+  // every completion that ran longer than five minutes. Streaming makes headers
+  // arrive at once and each chunk resets bodyTimeout, which leaves timeoutMs as
+  // the only real deadline.
   const body = await request("/chat/completions", {
     method: "POST",
     timeoutMs,
-    body: { model, messages, max_tokens: maxTokens, ...reasoningParams(model, effort) }
+    body: {
+      model,
+      messages,
+      max_tokens: maxTokens,
+      stream: true,
+      stream_options: { include_usage: true },
+      ...reasoningParams(model, effort)
+    }
   });
   return parseCompletion(body);
 }

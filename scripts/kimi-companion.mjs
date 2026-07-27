@@ -281,4 +281,10 @@ const commands = {
 
 const handler = commands[subcommand];
 if (!handler) fail(`unknown subcommand: ${subcommand ?? "(none)"} — expected one of ${Object.keys(commands).join(", ")}`);
-Promise.resolve(handler(rest)).catch((err) => fail(err.message || String(err)));
+try {
+  // status/result/cancel are synchronous, so they throw before a promise exists:
+  // .catch() alone would let their validation errors escape as a stack trace.
+  await handler(rest);
+} catch (err) {
+  fail(err.message || String(err));
+}

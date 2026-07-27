@@ -73,6 +73,10 @@ Common flags: `--model` (default `kimi-k3`), `--effort low|high|max`, `--max-tok
 them. All of them spend completion budget on reasoning: if you get an empty answer with a
 `length` finish, raise `--max-tokens` or drop to `--effort low`.
 
+Completions are streamed, so a large `--max-tokens` is safe: `--timeout-mins` (default 10)
+is the only deadline. Requests were previously capped at five minutes by Node's transport
+layer regardless of that flag.
+
 ## Attachments
 
 `--file` is repeatable and accepts:
