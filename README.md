@@ -12,10 +12,25 @@ generation use a model that has it.
 ## Requirements
 
 - Node.js 18+ (no npm dependencies)
-- `MOONSHOT_API_KEY` set as an **OS-level environment variable** — Windows: user environment
-  variable (System Properties → Environment Variables); macOS/Linux: your shell profile.
-  Never a `.env` file, never a file in a repo. Restart Claude Code after setting it so the
-  value is inherited.
+- A Moonshot API key from the [Moonshot console](https://platform.moonshot.ai/console/api-keys)
+- That key set as an **OS-level environment variable** named `MOONSHOT_API_KEY`. Never a `.env`
+  file, never any file in a repo.
+
+Set the key, then **restart Claude Code** so the new value is inherited by the plugin's
+processes:
+
+```powershell
+# Windows (PowerShell) — persists for your user account
+setx MOONSHOT_API_KEY "your-key-here"
+```
+
+```bash
+# macOS / Linux — add to ~/.zshrc or ~/.bashrc, then reopen the shell
+export MOONSHOT_API_KEY="your-key-here"
+```
+
+Accounts on the mainland-China endpoint should also set `MOONSHOT_BASE_URL` to
+`https://api.moonshot.cn/v1`. Those two hosts are the only values the plugin accepts.
 
 Developed and tested on Windows. POSIX code paths exist but are untested — reports welcome.
 
@@ -28,11 +43,22 @@ In Claude Code:
 /plugin install kimi-companion
 ```
 
+If the repo is private or you want to run a local checkout, point the marketplace at the
+directory instead:
+
+```
+/plugin marketplace add C:/path/to/kimi-companion
+/plugin install kimi-companion
+```
+
 Then verify the key and connectivity:
 
 ```
 /kimi-companion:setup
 ```
+
+`setup` reports key presence, API reachability, and the model list. It never prints the key
+value.
 
 ## Quick start
 
@@ -74,8 +100,7 @@ them. All of them spend completion budget on reasoning: if you get an empty answ
 `length` finish, raise `--max-tokens` or drop to `--effort low`.
 
 Completions are streamed, so a large `--max-tokens` is safe: `--timeout-mins` (default 10)
-is the only deadline. Requests were previously capped at five minutes by Node's transport
-layer regardless of that flag.
+is the only deadline.
 
 ## Attachments
 
@@ -113,6 +138,32 @@ node --test "tests/*.test.mjs"
 
 Live end-to-end (uses your key, makes real API calls): run `setup`, an `ask`, an `ask --file`
 with an image, `review`, a `--background` job plus `status`/`result`/`cancel`.
+
+The entry script's subcommands match the slash command names, except `rescue`,
+`adversarial-review`, and `transfer`, which are `ask` runs with a different prompt preset.
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `MOONSHOT_API_KEY not set` | The variable was set after Claude Code started. Restart Claude Code — child processes inherit the environment at launch. |
+| `MOONSHOT_BASE_URL host not allowed` | Only `api.moonshot.ai` and `api.moonshot.cn` are accepted, over HTTPS. Unset the variable to fall back to the default. |
+| Empty answer with a `length` finish reason | Reasoning consumed the whole completion budget. Raise `--max-tokens` or drop to `--effort low`. |
+| `file too large` on `--file` | 20 MB per file, 40 MB per request, 4 MB per text file. Downscale or trim; there is no Files API upload path yet. |
+| Slash commands missing after install | Marketplace changes need a session restart. |
+
+## Roadmap / TODO
+
+- [ ] **Evaluate a secret manager instead of a plain environment variable.** A machine-wide env
+  var is readable by every process running as your user and can leak through crash dumps or a
+  careless `env` in a shell transcript. Options worth testing: the
+  [1Password CLI](https://developer.1password.com/docs/cli/secret-references/) (`op run -- claude`,
+  injecting `MOONSHOT_API_KEY` from a secret reference so the value exists only for the lifetime
+  of the process), the OS keychain (Windows Credential Manager, macOS Keychain, `libsecret`), or
+  short-lived tokens if Moonshot ships them. Decide whether the plugin reads the secret itself or
+  stays env-only and leaves injection to the launcher — env-only is the smaller attack surface and
+  keeps the current "key never touches disk" invariant intact. Whatever wins should land in both
+  companions identically.
 
 ## Routing policy
 
