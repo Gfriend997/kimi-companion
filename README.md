@@ -5,6 +5,10 @@ image and video understanding, code review, adversarial review, delegated tasks,
 background jobs. Sibling to [gemini-companion](https://github.com/Gfriend997/gemini-companion),
 rebuilt for the Moonshot API.
 
+The idea is not original. It is OpenAI's [codex-plugin-cc](https://github.com/openai/codex-plugin-cc),
+which established the pattern of driving a second model from inside Claude Code and set the
+command surface both companions follow. See [Credits](#credits).
+
 **Kimi does not generate images or video.** There is no such endpoint. Kimi *reads* images and
 video — screenshots, UI recordings, diagrams — and reasons over them. For raster image
 generation use a model that has it.
@@ -185,6 +189,19 @@ One Node entry script (`scripts/kimi-companion.mjs`), stdlib only. Four commands
 engine: build messages (preset + prompt + attachments) → one REST call → print. Libraries:
 `api.mjs` (REST client, host allowlist), `attach.mjs` (files → content parts), `jobs.mjs`
 (background state), `scrub.mjs` (secret masking).
+
+## Credits
+
+Original idea and command surface: **[openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc)**
+(Apache License 2.0, Copyright OpenAI). That plugin worked out the pattern this one copies —
+slash commands for delegate/review/status/result/cancel, background jobs with an id you poll,
+and a companion model that returns text for a human to act on rather than editing your files
+behind your back. The design decisions worth having were theirs first. This plugin reached
+that surface by way of the author's [gemini-companion](https://github.com/Gfriend997/gemini-companion) (MIT).
+
+No third-party source code was copied. The runtime here was written fresh against the Moonshot
+REST API and shares no codebase with either predecessor. This plugin is MIT licensed and is not
+affiliated with or endorsed by OpenAI or Moonshot AI.
 
 ## Known limitations
 
