@@ -113,6 +113,16 @@ them. All of them spend completion budget on reasoning: if you get an empty answ
 Completions are streamed, so a large `--max-tokens` is safe: `--timeout-mins` (default 10)
 is the only deadline.
 
+## Cost guards
+
+- Completion budget defaults to 8192 tokens (`--max-tokens` raises it). Completions are
+  streamed, so a large value is safe — `--timeout-mins` (default 10) is the only deadline,
+  and a hung call cannot run forever.
+- Attachment caps stop one stray binary from inflating a request: 20 MB per file
+  (`--max-file-mb`), 40 MB per request, 4 MB per text file.
+- `--effort low` switches thinking off on models that support it, cutting reasoning-token
+  spend on questions that don't need it.
+
 ## Attachments
 
 `--file` is repeatable and accepts:
