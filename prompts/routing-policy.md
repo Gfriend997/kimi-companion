@@ -12,7 +12,7 @@ Confirm with one line first, then proceed:
 - Adversarial review or background jobs — slower and quota-heavy.
 
 Never route to Kimi:
-- Image, video, or movie GENERATION. Moonshot has no such endpoint. Use the Gemini companion for raster image generation.
+- Image, video, or movie GENERATION. Moonshot has no such endpoint. Use grok-companion imagine for raster images (Gemini image --hq as fallback) and grok-companion video for video.
 
 When both companions are loaded:
 - Routine second opinion on a diff belongs to Gemini. Only run /kimi-companion:review when the user asks for Kimi by name, or when Gemini already reviewed and a third read is wanted. Do not run both for one diff.
