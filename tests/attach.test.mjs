@@ -68,3 +68,38 @@ test("attachments produce a parts array with the prompt last", () => {
 test("total attachment size is capped", () => {
   assert.throws(() => buildContent("x", [txt(), txt()], { maxTotalBytes: 30 }), /exceed the total limit/);
 });
+
+const REJECT = /attachment rejected: .* is a binary document; convert it to markdown first \(MarkItDown\) and attach the \.md/;
+
+test("rejects binary documents by upper-case extension", () => {
+  const f = path.join(dir, "REPORT.PDF");
+  fs.writeFileSync(f, "plain");
+  assert.throws(() => filePart(f), REJECT);
+});
+
+test("rejects binary documents by magic bytes despite a .txt extension", () => {
+  const magics = {
+    pdf: Buffer.from("%PDF-1.7\nabc"),
+    zip: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]),
+    ole: Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0x00]),
+    rtf: Buffer.from("{\rtf1\ansi hello")
+  };
+  for (const [name, data] of Object.entries(magics)) {
+    const f = path.join(dir, `${name}.txt`);
+    fs.writeFileSync(f, data);
+    assert.throws(() => filePart(f), REJECT, name);
+  }
+});
+
+test("rejects a NUL byte in the first 8 KB", () => {
+  const f = path.join(dir, "blob.dat");
+  fs.writeFileSync(f, Buffer.concat([Buffer.from("text"), Buffer.from([0]), Buffer.from("more")]));
+  assert.throws(() => filePart(f), REJECT);
+});
+
+test("normal text and code files still pass", () => {
+  const f = path.join(dir, "code.ts");
+  fs.writeFileSync(f, "export const x = 1;\n");
+  assert.equal(filePart(f).part.type, "text");
+  assert.equal(filePart(txt()).part.type, "text");
+});

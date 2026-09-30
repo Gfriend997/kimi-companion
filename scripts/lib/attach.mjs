@@ -35,6 +35,30 @@ export function classify(file) {
   return { kind: "text", mime: "text/plain" };
 }
 
+const BINARY_DOC_EXT = new Set([
+  ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".rtf", ".zip", ".7z", ".rar", ".epub"
+]);
+const BINARY_MAGIC = [
+  Buffer.from("%PDF-"),
+  Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+  Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
+  Buffer.from("{\rtf")
+];
+
+// Binary documents decode to garbage as UTF-8 and the model answers confidently wrong.
+export function isBinaryDoc(file, data) {
+  if (BINARY_DOC_EXT.has(path.extname(file).toLowerCase())) return true;
+  if (!data) return false;
+  if (BINARY_MAGIC.some((m) => data.subarray(0, m.length).equals(m))) return true;
+  return data.subarray(0, 8192).includes(0);
+}
+
+function rejectBinary(file) {
+  return new Error(
+    `attachment rejected: ${path.basename(file)} is a binary document; convert it to markdown first (MarkItDown) and attach the .md`
+  );
+}
+
 function statFile(file, maxBytes) {
   const resolved = path.resolve(file);
   let st;
@@ -55,11 +79,13 @@ function statFile(file, maxBytes) {
 
 export function filePart(file, { maxBytes = DEFAULT_MAX_FILE_BYTES } = {}) {
   const { kind, mime } = classify(file);
+  if (kind === "text" && isBinaryDoc(file)) throw rejectBinary(file);
   const limit = kind === "text" ? Math.min(maxBytes, DEFAULT_MAX_TEXT_BYTES) : maxBytes;
   const { resolved, size } = statFile(file, limit);
   const data = fs.readFileSync(resolved);
 
   if (kind === "text") {
+    if (isBinaryDoc(file, data)) throw rejectBinary(file);
     return {
       size,
       part: { type: "text", text: `--- file: ${file} ---\n${data.toString("utf8")}\n--- end of ${file} ---` }
