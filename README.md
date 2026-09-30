@@ -130,7 +130,7 @@ is the only deadline.
 - **Images** — png, jpg, jpeg, webp, gif, bmp (inline base64)
 - **Video** — mp4, mov, webm, mkv, avi (inline base64)
 - **Anything else** — read as UTF-8 text and inlined, labeled with its path
-- **Binary documents are rejected** (PDF, Word, Excel, PowerPoint, OpenDocument, RTF, zip, epub, or any file with a NUL byte in its first 8 KB): convert to markdown first (MarkItDown) and attach the `.md`
+- **Binary documents are rejected** (PDF, Word, Excel, PowerPoint, OpenDocument, zip, epub, or any file with a NUL byte in its first 8 KB): convert to markdown first (MarkItDown) and attach the `.md`
 
 Limits: 20 MB per file (`--max-file-mb`), 40 MB per request, 4 MB per text file. Larger media
 must be trimmed or downscaled — there is no Files API upload path yet.

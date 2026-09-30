@@ -81,8 +81,7 @@ test("rejects binary documents by magic bytes despite a .txt extension", () => {
   const magics = {
     pdf: Buffer.from("%PDF-1.7\nabc"),
     zip: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]),
-    ole: Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0x00]),
-    rtf: Buffer.from("{\rtf1\ansi hello")
+    ole: Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0x00])
   };
   for (const [name, data] of Object.entries(magics)) {
     const f = path.join(dir, `${name}.txt`);
@@ -102,4 +101,19 @@ test("normal text and code files still pass", () => {
   fs.writeFileSync(f, "export const x = 1;\n");
   assert.equal(filePart(f).part.type, "text");
   assert.equal(filePart(txt()).part.type, "text");
+});
+
+test("decodes UTF-16 text files instead of rejecting them for NUL bytes", () => {
+  const le = path.join(dir, "ps51-out.txt");
+  fs.writeFileSync(le, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("hello from powershell", "utf16le")]));
+  assert.match(filePart(le).part.text, /hello from powershell/);
+  const be = path.join(dir, "be.txt");
+  fs.writeFileSync(be, Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from("big endian", "utf16le").swap16()]));
+  assert.match(filePart(be).part.text, /big endian/);
+});
+
+test("accepts RTF as text", () => {
+  const f = path.join(dir, "note.rtf");
+  fs.writeFileSync(f, "{\rtf1\ansi hello}");
+  assert.match(filePart(f).part.text, /hello/);
 });

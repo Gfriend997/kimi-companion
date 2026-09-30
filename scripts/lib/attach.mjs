@@ -36,13 +36,12 @@ export function classify(file) {
 }
 
 const BINARY_DOC_EXT = new Set([
-  ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".rtf", ".zip", ".7z", ".rar", ".epub"
+  ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".zip", ".7z", ".rar", ".epub"
 ]);
 const BINARY_MAGIC = [
   Buffer.from("%PDF-"),
   Buffer.from([0x50, 0x4b, 0x03, 0x04]),
-  Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
-  Buffer.from("{\rtf")
+  Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])
 ];
 
 // Binary documents decode to garbage as UTF-8 and the model answers confidently wrong.
@@ -50,7 +49,20 @@ export function isBinaryDoc(file, data) {
   if (BINARY_DOC_EXT.has(path.extname(file).toLowerCase())) return true;
   if (!data) return false;
   if (BINARY_MAGIC.some((m) => data.subarray(0, m.length).equals(m))) return true;
-  return data.subarray(0, 8192).includes(0);
+  return !hasUtf16Bom(data) && data.subarray(0, 8192).includes(0);
+}
+
+const hasUtf16Bom = (b) => b.length >= 2 && ((b[0] === 0xff && b[1] === 0xfe) || (b[0] === 0xfe && b[1] === 0xff));
+
+// Windows PowerShell 5.1 writes UTF-16 by default; decode it instead of rejecting it for its NUL bytes.
+export function decodeText(buf) {
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) return buf.subarray(2).toString("utf16le");
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+    const body = Buffer.from(buf.subarray(2, buf.length - (buf.length % 2)));
+    return body.swap16().toString("utf16le");
+  }
+  if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) return buf.subarray(3).toString("utf8");
+  return buf.toString("utf8");
 }
 
 function rejectBinary(file) {
@@ -88,7 +100,7 @@ export function filePart(file, { maxBytes = DEFAULT_MAX_FILE_BYTES } = {}) {
     if (isBinaryDoc(file, data)) throw rejectBinary(file);
     return {
       size,
-      part: { type: "text", text: `--- file: ${file} ---\n${data.toString("utf8")}\n--- end of ${file} ---` }
+      part: { type: "text", text: `--- file: ${file} ---\n${decodeText(data)}\n--- end of ${file} ---` }
     };
   }
   const url = `data:${mime};base64,${data.toString("base64")}`;
