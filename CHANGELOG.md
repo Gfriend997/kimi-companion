@@ -2,6 +2,14 @@
 
 Entries start at 0.1.3. Earlier history is in `git log`.
 
+## 0.1.5
+
+### Changed
+- The session routing policy no longer sends routine diff reviews to Gemini. Routine diffs go to the host's own reviewer. Gemini reviews only large or risky diffs, and Kimi reviews only on request or as a third read on a risky diff.
+
+### Added
+- `.specify/` Spec Kit setup from the pinned fork `Gfriend997/spec-kit@3238fa9`.
+
 ## 0.1.4
 
 ### Fixed
