@@ -1,6 +1,6 @@
 # kimi-companion Constitution
 
-Status: PROPOSED 2026-11-22. This file restates the existing invariants and conventions in `AGENTS.md`. Gary has not ratified it yet. Where this file and `AGENTS.md` differ, `AGENTS.md` wins until it is ratified.
+Status: RATIFIED 2026-11-22 by Gary (Claude Code chat: "ratify the Kimi constitution"). This file restates the existing invariants and conventions in `AGENTS.md`. Keep the two in sync. A change to either one needs Gary's approval under `.specify/pre-code-gate.md`.
 
 ## Core principles
 
