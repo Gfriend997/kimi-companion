@@ -1,6 +1,6 @@
 ---
 description: Hostile second-pass Kimi review hunting for breakage in the current diff
-argument-hint: "[--base <ref>] [--model <m>] [--effort low|high|max]"
+argument-hint: "[--base <ref>] [--model <m>] [--effort low|high|max] [--max-tokens <n>] [--timeout-mins <n>] [--show-reasoning] [--background]"
 allowed-tools: Bash(node:*)
 ---
 

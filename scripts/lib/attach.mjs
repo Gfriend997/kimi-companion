@@ -109,6 +109,16 @@ export function filePart(file, { maxBytes = DEFAULT_MAX_FILE_BYTES } = {}) {
     : { size, part: { type: "video_url", video_url: { url } } };
 }
 
+// Caps text at maxBytes of UTF-8 (not JS characters), appending marker when cut.
+// Backs off to a character boundary so a split character never becomes U+FFFD.
+export function truncateUtf8(text, maxBytes, marker = "") {
+  const buf = Buffer.from(text, "utf8");
+  if (buf.length <= maxBytes) return text;
+  let end = maxBytes;
+  while (end > 0 && (buf[end] & 0xc0) === 0x80) end--; // buf[end] continues a character
+  return buf.subarray(0, end).toString("utf8") + marker;
+}
+
 // Returns a plain string when there are no attachments (the API's simple form)
 // and a parts array otherwise.
 export function buildContent(text, files = [], opts = {}) {

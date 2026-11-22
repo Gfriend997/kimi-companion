@@ -13,8 +13,10 @@ before changing anything.
 | `prompts/` | System prompt presets (`review`, `adversarial-review`, `rescue`) and the session routing policy |
 | `hooks/hooks.json` | SessionStart: inject routing policy. Stop: optional review gate (off by default) |
 | `scripts/kimi-companion.mjs` | Single runtime entry, stdlib only |
+| `scripts/print-routing-policy.mjs`, `scripts/stop-review-gate-hook.mjs` | SessionStart and Stop hook entry points |
 | `scripts/lib/` | `api.mjs` (REST client), `attach.mjs` (files → content parts), `jobs.mjs` (background state), `scrub.mjs` (secret masking) |
-| `tests/` | `node --test` suites for api, attach, jobs, scrub |
+| `tests/` | `node --test` suites for api, attach, cli, gate, jobs, scrub |
+| `specs/` | Spec Kit feature specs, plans, tasks and decisions (from 001 on); `.specify/` holds the pinned fork setup |
 | `docs/specs/` | Design spec — the decision record, including why there is no CLI dependency |
 
 `prompts/<name>.md` doubles as the `--preset <name>` registry: add a file, get a preset.

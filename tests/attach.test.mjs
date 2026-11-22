@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { classify, filePart, buildContent } from "../scripts/lib/attach.mjs";
+import { classify, filePart, buildContent, truncateUtf8 } from "../scripts/lib/attach.mjs";
 
 let dir;
 const png = () => path.join(dir, "pixel.png");
@@ -116,4 +116,18 @@ test("accepts RTF as text", () => {
   const f = path.join(dir, "note.rtf");
   fs.writeFileSync(f, "{\rtf1\ansi hello}");
   assert.match(filePart(f).part.text, /hello/);
+});
+
+test("truncateUtf8 caps by UTF-8 bytes, not JS characters", () => {
+  const text = "é".repeat(1000); // 2 bytes each
+  const out = truncateUtf8(text, 100, "[cut]");
+  assert.ok(out.endsWith("[cut]"));
+  assert.ok(Buffer.byteLength(out.slice(0, -5), "utf8") <= 100);
+  assert.equal(truncateUtf8("short", 100, "[cut]"), "short");
+});
+
+test("truncateUtf8 never splits a multi-byte character", () => {
+  const out = truncateUtf8("é".repeat(10), 5, "[cut]"); // 5 bytes would split the 3rd é
+  assert.equal(out, "éé[cut]");
+  assert.doesNotMatch(out, /�/);
 });

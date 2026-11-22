@@ -13,10 +13,10 @@ import { fileURLToPath } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { parseArgs } from "node:util";
 
-import { chat, listModels, DEFAULT_MODEL, DEFAULT_MAX_TOKENS, EFFORT_LEVELS } from "./lib/api.mjs";
-import { buildContent, DEFAULT_MAX_FILE_BYTES } from "./lib/attach.mjs";
+import { chat, listModels, effortIgnored, DEFAULT_MODEL, DEFAULT_MAX_TOKENS, EFFORT_LEVELS } from "./lib/api.mjs";
+import { buildContent, truncateUtf8, DEFAULT_MAX_FILE_BYTES } from "./lib/attach.mjs";
 import { companionHome, createJob, readJob, updateJob, listJobs, cancelJob } from "./lib/jobs.mjs";
-import { scrub } from "./lib/scrub.mjs";
+import { scrub, scrubDeep } from "./lib/scrub.mjs";
 
 const SELF = fileURLToPath(import.meta.url);
 const ROOT = path.dirname(path.dirname(SELF));
@@ -42,7 +42,7 @@ function readConfig() {
 function writeConfig(patch) {
   fs.mkdirSync(companionHome(), { recursive: true });
   const next = { ...readConfig(), ...patch };
-  fs.writeFileSync(configFile(), JSON.stringify(next, null, 2));
+  fs.writeFileSync(configFile(), JSON.stringify(scrubDeep(next), null, 2));
   return next;
 }
 
@@ -114,11 +114,15 @@ function askSpecFrom(values, prompt) {
   if (values.effort && !EFFORT_LEVELS.includes(values.effort)) {
     throw new Error(`--effort must be one of ${EFFORT_LEVELS.join(", ")}`);
   }
+  const model = values.model ?? DEFAULT_MODEL;
+  if (effortIgnored(model, values.effort)) {
+    process.stderr.write(scrub(`warning: ${model} ignores --effort ${values.effort}; sending the request without it\n`));
+  }
   return {
     prompt,
     files: values.file ?? [],
     preset: values.preset ?? null,
-    model: values.model ?? DEFAULT_MODEL,
+    model,
     effort: values.effort ?? null,
     maxTokens: values["max-tokens"] ? Number(values["max-tokens"]) : DEFAULT_MAX_TOKENS,
     maxFileBytes: values["max-file-mb"] ? Number(values["max-file-mb"]) * 1048576 : DEFAULT_MAX_FILE_BYTES,
@@ -159,26 +163,26 @@ async function cmdAsk(args) {
     fail('usage: ask "<prompt>" [--file path]... [--model m] [--effort low|high|max] [--preset rescue] [--background]');
   }
   const spec = askSpecFrom(values, prompt);
-
-  if (values.background) {
-    const job = createJob({ kind: spec.preset ?? "ask", prompt, spec: { ...spec, cwd: process.cwd() }, cwd: process.cwd() });
-    const logFile = path.join(companionHome(), "jobs", `${job.id}.log`);
-    const log = fs.openSync(logFile, "a");
-    const child = spawn(process.execPath, [SELF, "ask-worker", job.id], {
-      detached: true,
-      stdio: ["ignore", log, log],
-      cwd: process.cwd(),
-      env: process.env
-    });
-    child.unref();
-    updateJob(job.id, { pid: child.pid });
-    out(`Started background Kimi job ${job.id} (worker pid ${child.pid}).`);
-    out(`Check with: status --id ${job.id} · fetch with: result --id ${job.id}`);
-    return;
-  }
-
+  if (values.background) return launchBackground(spec, prompt);
   const res = await runAsk(spec);
   out(renderAnswer(res, spec));
+}
+
+// label is what `status` lists for the job; the full prompt stays in job.spec.
+function launchBackground(spec, label) {
+  const job = createJob({ kind: spec.preset ?? "ask", prompt: label, spec: { ...spec, cwd: process.cwd() }, cwd: process.cwd() });
+  const logFile = path.join(companionHome(), "jobs", `${job.id}.log`);
+  const log = fs.openSync(logFile, "a");
+  const child = spawn(process.execPath, [SELF, "ask-worker", job.id], {
+    detached: true,
+    stdio: ["ignore", log, log],
+    cwd: process.cwd(),
+    env: process.env
+  });
+  child.unref();
+  updateJob(job.id, { pid: child.pid });
+  out(`Started background Kimi job ${job.id} (worker pid ${child.pid}).`);
+  out(`Check with: status --id ${job.id} · fetch with: result --id ${job.id}`);
 }
 
 async function cmdAskWorker(args) {
@@ -202,13 +206,16 @@ function gitDiff(base) {
   const r = spawnSync("git", ["diff", ...range], { encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
   if (r.status !== 0) fail(`git diff failed: ${(r.stderr || "").trim()}`);
   let diff = r.stdout;
-  if (!diff.trim()) {
-    // fall back to the last commit so "review" works right after committing
+  if (!diff.trim() && !base) {
+    // fall back to the last commit so "review" works right after committing.
+    // Not with an explicit --base: an empty range there means nothing to review.
     const last = spawnSync("git", ["diff", "HEAD~1..HEAD"], { encoding: "utf8", maxBuffer: 10 * 1024 * 1024 });
     diff = last.status === 0 ? last.stdout : "";
   }
-  if (!diff.trim()) fail("no diff to review (working tree clean and no previous commit range)");
-  if (Buffer.byteLength(diff) > MAX_DIFF_BYTES) diff = diff.slice(0, MAX_DIFF_BYTES) + "\n[diff truncated at 200KB]";
+  if (!diff.trim()) fail(base
+    ? `no diff to review against ${base}`
+    : "no diff to review (working tree clean and no previous commit range)");
+  diff = truncateUtf8(diff, MAX_DIFF_BYTES, "\n[diff truncated at 200KB]");
   return diff;
 }
 
@@ -220,12 +227,16 @@ async function cmdReview(args) {
       base: { type: "string" },
       model: { type: "string", default: DEFAULT_MODEL },
       effort: { type: "string" },
-      "max-tokens": { type: "string" }
+      "max-tokens": { type: "string" },
+      "timeout-mins": { type: "string" },
+      "show-reasoning": { type: "boolean", default: false },
+      background: { type: "boolean", default: false }
     },
     allowPositionals: false
   });
   const spec = askSpecFrom(values, `## Diff under review\n\n\`\`\`diff\n${gitDiff(values.base)}\n\`\`\``);
   spec.preset = values.adversarial ? "adversarial-review" : "review";
+  if (values.background) return launchBackground(spec, `${spec.preset}${values.base ? ` --base ${values.base}` : ""}`);
   const res = await runAsk(spec);
   out(renderAnswer(res, spec));
 }

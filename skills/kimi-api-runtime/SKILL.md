@@ -11,7 +11,7 @@ Single entry point: `node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" <su
 |---|---|---|
 | `setup` | Key presence, API reachability, model list, gate toggle | `--gate on\|off` |
 | `ask "<prompt>"` | One completion, optionally over attached files | `--file <path>` (repeatable) `--model <m>` `--effort low\|high\|max` `--preset rescue` `--max-tokens <n>` `--max-file-mb <n>` `--timeout-mins <n>` `--show-reasoning` `--background` |
-| `review` | Review the current git diff | `--adversarial --base <ref> --model <m> --effort <e>` |
+| `review` | Review the current git diff | `--adversarial --base <ref> --model <m> --effort <e> --max-tokens <n> --timeout-mins <n> --show-reasoning --background` |
 | `status` | List jobs / one job | `--id <job-id>` |
 | `result` | Print a finished job's output | `--id <job-id>` |
 | `cancel` | Kill a background job | `--id <job-id>` |

@@ -59,6 +59,11 @@ export function reasoningParams(model, effort) {
   return {};
 }
 
+// True when --effort was given but reasoningParams sends nothing for this model.
+export function effortIgnored(model, effort) {
+  return Boolean(effort) && Object.keys(reasoningParams(model, effort)).length === 0;
+}
+
 export function parseCompletion(body) {
   const choice = body?.choices?.[0];
   if (!choice) throw new Error("no completion in API response");
@@ -163,6 +168,8 @@ async function request(pathname, { method = "GET", body, timeoutMs = DEFAULT_TIM
           ...(body ? { "Content-Type": "application/json" } : {})
         },
         body: body ? JSON.stringify(body) : undefined,
+        // Following a redirect would leave the allowlisted host; fail instead.
+        redirect: "error",
         signal: controller.signal
       });
     } catch (err) {

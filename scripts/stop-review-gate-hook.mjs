@@ -20,9 +20,11 @@ function gateEnabled() {
 
 if (!gateEnabled()) process.exit(0);
 
-// Nothing to review → let the stop proceed.
-const dirty = spawnSync("git", ["status", "--porcelain"], { encoding: "utf8" });
-if (dirty.status !== 0 || !dirty.stdout.trim()) process.exit(0);
+// Nothing to review → let the stop proceed. Only tracked changes count: `review`
+// diffs against HEAD, so untracked-only trees would fall back to the last commit.
+// Exit 1 means differences; 0 is clean, anything else (no repo, no HEAD) skips.
+const dirty = spawnSync("git", ["diff", "HEAD", "--quiet"], { stdio: "ignore" });
+if (dirty.status !== 1) process.exit(0);
 
 const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), "kimi-companion.mjs");
 const review = spawnSync(process.execPath, [entry, "review"], { encoding: "utf8", timeout: 9 * 60 * 1000 });

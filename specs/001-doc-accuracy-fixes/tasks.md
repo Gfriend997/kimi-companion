@@ -1,0 +1,22 @@
+# Tasks: Spec 001
+
+- [x] T1 Install Spec Kit from pinned fork `3238fa9` (staged copy; CLI blocked by App Control)
+- [x] T2 Independent verification of the findings: Grok, Gemini, Kimi, Codex
+- [x] T3 Jev round 1 (D1–D6), separate call for D7, round 2 (D8–D11)
+- [x] T4 Owner decisions D2, D4, D5
+- [x] T5 README: key setup (F1), flags (F2/D2), routing (F4), Testing note (F5), models plus effort column (F6/F7/D5), review rules (F8), deduplication (F10), the disk-claim scope, UTF-16, outbound scrubbing, deadlines, troubleshooting, Architecture wording, `KIMI_COMPANION_HOME`, gate limitation
+- [x] T6 `commands/ask.md` (F3, F12), `commands/review.md` and `commands/adversarial-review.md` (fallback rules, argument hints), `agents/kimi-rescue.md` (background rule), `skills/kimi-api-runtime/SKILL.md` (F11, D2)
+- [x] T7 AGENTS.md: test map (F9) and hook scripts in the repo map
+- [x] T8 `git mv` the bug report to `docs/` (D3); no inbound links existed
+- [x] T9 Code fixes with regression tests: gate (D7), redirect (D9), `--base` fallback (D10), byte truncation (D11), config scrub (D8), review flags (D2), effort warning (D5)
+- [x] T10 Version 0.1.4 and CHANGELOG.md (D4)
+- [x] T11 `node --test "tests/*.test.mjs"`: 59/59 pass after T12; `hooks.json` and `plugin.json` parse
+- [x] T12 Final-diff review by the models
+  - Codex (`review --scope working-tree`): no actionable regressions.
+  - Grok: "nothing wrong" (single-line reply).
+  - Kimi (this plugin's patched `review`, `kimi-k3`, 14,648 + 5,600 tokens): sound; 4 minor findings.
+  - Gemini (`gemini-3.8-flash`, about $0.011): 7 findings.
+  - Fixed: `--show-reasoning` missing from the review and adversarial-review hints (Gemini, Kimi); `truncateUtf8` could produce U+FFFD and go over the cap, so it now backs off to a character boundary and has an odd-cap test (Gemini); clean-tree gate test added (Gemini); stale spec status line (Kimi); `specs/` added to the AGENTS.md repo map (Kimi).
+  - Rejected: README misdescribes `transfer` (Gemini). `commands/transfer.md` does run `ask --preset rescue`.
+  - Not changed: the config-scrub test checks only a boolean, because config can only hold a code-set boolean today (Gemini). `review --background` test cleanup races the detached worker; it is mitigated by best-effort cleanup and recorded as a possible flake source (Kimi).
+- [ ] T13 Owner reviews the branch `fix/doc-accuracy`. Committing and pushing need the owner's go-ahead.

@@ -7,7 +7,9 @@ import {
   reasoningParams,
   parseCompletion,
   transportError,
-  collectStream
+  collectStream,
+  listModels,
+  effortIgnored
 } from "../scripts/lib/api.mjs";
 
 // Feeds bytes to collectStream the way a socket would: arbitrary chunk boundaries.
@@ -149,4 +151,25 @@ test("collectStream surfaces an error event mid-stream", async () => {
     () => collectStream(bytes(sse({ error: { message: "rate limit reached" } }))),
     /rate limit reached/
   );
+});
+
+test("requests refuse redirects so they cannot leave the allowlisted host", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  let seen;
+  globalThis.fetch = async (url, opts) => {
+    seen = opts;
+    return new Response(JSON.stringify({ data: [{ id: "kimi-k3" }] }), { status: 200 });
+  };
+  process.env.MOONSHOT_API_KEY = "test-key-not-real";
+  assert.deepEqual(await listModels(), ["kimi-k3"]);
+  assert.equal(seen.redirect, "error");
+});
+
+test("effortIgnored flags the model/effort pairs reasoningParams drops", () => {
+  assert.equal(effortIgnored("kimi-k3", "high"), false);
+  assert.equal(effortIgnored("kimi-k2.6", "low"), false);
+  assert.equal(effortIgnored("kimi-k2.6", "high"), true);
+  assert.equal(effortIgnored("kimi-k2.7-code", "low"), true);
+  assert.equal(effortIgnored("kimi-k2.7-code", null), false);
 });

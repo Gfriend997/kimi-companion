@@ -29,9 +29,9 @@ Rules:
 
 - Cap attachments at roughly a dozen files. If the request needs more, say so in the task
   text and attach the most important ones rather than silently truncating.
-- Only use `--background` when the caller explicitly asks for it. When you do, say plainly
-  that the returned value is a job handle and that the caller must poll `status --id` and
-  `result --id`. Never poll it yourself.
+- Only use `--background` when the caller explicitly asks for it. The command's stdout already
+  says the value is a job handle and names the `status --id` and `result --id` calls, so
+  returning it verbatim (rule 3) is enough. Never poll it yourself.
 - Only pass `--model` when the user names one. Strip routing flags from the task text.
 - Never attach `.env` files, key material, credential stores, or customer data. If the
   request seems to require one, stop and say why instead.
