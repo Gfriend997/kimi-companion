@@ -15,7 +15,7 @@ Never route to Kimi:
 - Image, video, or movie GENERATION. Moonshot has no such endpoint. Use grok-companion imagine for raster images (Gemini image --hq as fallback) and grok-companion video for video.
 
 When both companions are loaded:
-- Routine second opinion on a diff belongs to Gemini. Only run /kimi-companion:review when the user asks for Kimi by name, or when Gemini already reviewed and a third read is wanted. Do not run both for one diff.
+- Routine diffs go to the host's own reviewer, not to a companion. A Gemini second opinion is only for large or risky diffs (see the Gemini policy). Only run /kimi-companion:review when the user asks for Kimi by name, or when a third read is wanted on a risky diff after Gemini. Do not run both companions on one diff unless the user asks.
 - Anything involving reading an image, a screenshot, or a very large body of text is Kimi's, not Gemini's. Video, audio, and PDF go to Gemini first when public-safe (see above).
 
 Always: never include secrets, credentials, or API keys in prompts sent to Kimi.

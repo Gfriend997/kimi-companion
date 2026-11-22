@@ -1,0 +1,13 @@
+{
+  "repository": "https://github.com/Gfriend997/spec-kit.git",
+  "commit": "3238fa9285694dc539aeb9829b337bfd6aed7317",
+  "version": "1.2.1.dev0",
+  "installation_method": "copied from Gemini Companion .specify/ (same pinned commit 3238fa9, reviewed staged copy of templates and PowerShell scripts) on 2026-11-22; specify.exe blocked by Windows Application Control",
+  "script": "ps",
+  "governance_additions": [
+    ".specify/pre-code-gate.md",
+    ".specify/templates/decision-template.md"
+  ],
+  "approval_scope": "Standing instruction to use this fork and write specifications/decisions before custom software implementation; no feature approval implied",
+  "project_identity": "kimi-companion Claude Code plugin, https://github.com/Gfriend997/kimi-companion, local clone at AIOG/Custom Software/Kimi Companion/source (installed as user-scope plugin kimi-companion@kimi-companion)"
+}
